@@ -86,9 +86,11 @@ flatpickr('#offTime',{
 			alert(new_device);
 			var new_device_unix = "#" + name + "," + location + "," + onTime_cut[1] + "," + offTime_cut[1] + "," + pattern + "," + hcode + "," + pcode ;
 			alert(new_device_unix);
-			var cars = ["#",name ,location,onTime_cut[1],offTime_cut[1],pattern,hcode,pcode];
-			alert(cars);
-			connection.send(cars);
+			connection.send(new_device_unix)
+			//var new_device_unixstr = '#'+ new_device_unix.toString(16); 
+			//var cars = ["#",name ,location,onTime_cut[1],offTime_cut[1],pattern,hcode,pcode];
+			//alert(cars);
+			//connection.send(cars);
 			$("table tbody").append(markup);
 			
 			
@@ -112,8 +114,8 @@ flatpickr('#offTime',{
 </head>
 <body>
     <form>
-        <input type="text" id="name" placeholder="Device Name">
-        <input type="text" id="location" placeholder="Location">
+        <input type="text" value="pool" id="name" placeholder="Device Name">
+        <input type="text" value="garden" id="location" placeholder="Location">
 		<input type="text" id="onTime" placeholder="onTime">
 		<input type="text" id="offTime" placeholder="offTime">
 		<input class=calendar data-enabletime=true>
@@ -126,8 +128,8 @@ flatpickr('#offTime',{
 				<option value="MRepeat">YRepeat</option>
 				<option value="Random">Random</option>
 		</select> 
-		<input type="text" id="hcode" placeholder="hcode">
-		<input type="text" id="pcode" placeholder="pcode">
+		<input type="text" value="1234" id="hcode" placeholder="hcode">
+		<input type="text" value="12" id="pcode" placeholder="pcode">
 		
     	<input type="button" class="add-row" value="Schedule a device">
 		
