@@ -30,32 +30,29 @@ const char *password2 = "risky0069";   // The password required to connect to it
 const char *OTAName = "ESP8266";           // A name and a password for the OTA service
 const char *OTAPassword = "risky0069";
 
-#define LED_RED     15            // specify the pins with an RGB LED connected
-#define LED_GREEN   12
-#define LED_BLUE    13
 
 int length;         //Used to hold data length
 
 //packet vars
-//receive vars for chars
-#define SOP '<'
-#define EOP '>'
+// Define number of pieces
+const int numberOfPieces = 4;
+String pieces[numberOfPieces];
 
-bool started = false;
-bool ended = false;
 
-char inData[20];//13 for vars + SOP +EOP +NULL = 16 total (if this is set for < 16 < you may see chars cut-off/missing or connections repudiated
-byte indexA;
+// Keep track of current position in array
+int counter = 0;
 
+// Keep track of the last comma so we know where to start the substring
+int lastIndex = 0;
+
+//end packet vars
 
 const char* mdnsName = "esp8266"; // Domain name for the mDNS responder
 
 /*__________________________________________________________SETUP__________________________________________________________*/
 
 void setup() {
-  pinMode(LED_RED, OUTPUT);    // the pins with LEDs connected are outputs
-  pinMode(LED_GREEN, OUTPUT);
-  pinMode(LED_BLUE, OUTPUT);
+
 
   Serial.begin(115200);        // Start the Serial communication to send messages to the computer
   delay(10);
@@ -85,15 +82,17 @@ int hue = 0;
 void loop() {
   webSocket.loop();                           // constantly check for websocket events
   server.handleClient();                      // run the server
-//  ArduinoOTA.handle();                        // listen for OTA events
+  //  ArduinoOTA.handle();                        // listen for OTA events
 
 }
+
+
 
 /*__________________________________________________________SETUP_FUNCTIONS__________________________________________________________*/
 
 void startWiFi() { // Start a Wi-Fi access point, and try to connect to some given access points. Then wait for either an AP or STA connection
   // WiFi.softAP(ssid2, password2);             // Start the access point
-  
+
   WiFi.hostname(deviceName);      // DHCP Hostname (useful for finding device for static lease)
   WiFi.config(staticIP, subnet, gateway, dns);
   server.serveStatic("/fp", SPIFFS, "/flatpickr3.html");
@@ -107,7 +106,7 @@ void startWiFi() { // Start a Wi-Fi access point, and try to connect to some giv
     delay(500);
     Serial.print(".");
   }
-  
+
   Serial.println("\r\n");
   if (WiFi.softAPgetStationNum() == 0) {     // If the ESP is connected to an AP
     Serial.print("Connected to ");
@@ -121,7 +120,7 @@ void startWiFi() { // Start a Wi-Fi access point, and try to connect to some giv
 }//end startWiFi
 
 /*
-void startOTA() { // Start the OTA service
+  void startOTA() { // Start the OTA service
   ArduinoOTA.setHostname(OTAName);
   // ArduinoOTA.setPassword(OTAPassword);
 
@@ -147,7 +146,7 @@ void startOTA() { // Start the OTA service
   });
   ArduinoOTA.begin();
   Serial.println("OTA ready\r\n");
-}//end startOTA
+  }//end startOTA
 */
 
 void startSPIFFS() { // Start the SPIFFS and list all contents
@@ -247,98 +246,206 @@ void handleFileUpload() { // upload a new file to the SPIFFS
 
 //changed tis line
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) { // When a WebSocket message is received
- 
-  
+
+
   switch (type) {
     case WStype_DISCONNECTED:             // if the websocket is disconnected
       //Serial.printf("[%u] Disconnected!\n", num);
-       Serial.printf("[%u] Disconnected!\n");
+      Serial.printf("[%u] Disconnected!\n");
       break;
     case WStype_CONNECTED: {              // if a new websocket connection is established
         IPAddress ip = webSocket.remoteIP(num);
-//        IPAddress ip = webSocket.remoteIP();
+        //        IPAddress ip = webSocket.remoteIP();
         //changed this
-       Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
+        Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
         //with this
-     //   Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", ip[0], ip[1], ip[2], ip[3], payload);
+        //   Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", ip[0], ip[1], ip[2], ip[3], payload);
         rainbow = false;                  // Turn rainbow off when a new connection is established
       }
       break;
     case WStype_TEXT:                     // if new text data is received
-    //for(int i = 0; i < length; i++) Serial.print((char) payload[i]);
-    char output[128] ={};
-    for(int i = 0; i < length; i++) output[i] = payload[i] + '0'; Serial.println("this is output ");Serial.println(output[i]);
-   // Serial.println("this is output ");
-   // Serial.println(output[i]);
-//char output[i] = payload[i] + '0';
-    //added by Den
-  //  char str1,str2;
-  //  int val1,val2;
-//    for(int i = 0; i < length; i++) sscanf(payload[i],"%[^,],%[^,],%d,%d",&str1, &str2, &val1, &val2);
-  //  sscanf((char) payload[i],"%[^,],%[^,],%d,%d",&str1, &str2, &val1, &val2);
-    
-   Serial.println();
+      for (int i = 0; i < length; i++) Serial.print((char) payload[i]);
+
+      //sscanf(payload[sizeof(payload)], "%s,%s,%s,%s,%s,%s,%s", A, B, C, D, E,F ,G);
+      //char output[i] = payload[i] + '0';
+
+      Serial.println();
 
 
-   String payload_str = String((char*) payload);
-   Serial.println("This is payload as a string");
-Serial.println(payload_str);
+      //sscanf((char *) &payload[0], "%s,%s,%s,%s,%s,%s,%s", A, B, C, D, E,F ,G);
+      //Serial.println(A);
+      //Serial.println(B);
+      //(char *) &payload[0]
+      String payload_str = String((char*) payload);
+      Serial.println("This is payload as a string");
+      Serial.println(payload_str);
+      //new add .6.28PM 180918
 
-//if(payload_str == "requesttemp")
-   /*
-  USE_SERIAL.printf("[WSc] get text: %s\n", payload);
-memcpy(arrPattern, arrRightOn, sizeof arrPattern);
-            // send data to back to Server
-            webSocket.sendTXT(payload, lenght);
-            break;
-            */
-   //edn possible other option add below line
-   //Serial.printf("[%u] here it is: %s\n",payload);
-   //and commented this
-   Serial.printf("[%u] here it is: %s\n", num, payload);
-    webSocket.sendTXT(0,"pong"); //send message back to client
-    Serial.println("Handling files now ...ROCKOFF");
- //add spiffss den
-// Assign a file name e.g. 'names.dat' or 'data.txt' or 'data.dat' try to use the 8.3 file naming convention format could be 'data.d'
-  char filename [] = "datalog.txt";                     // Assign a filename or use the format e.g. SD.open("datalog.txt",...);
+      char separator = ',';
+      int index = 5;
+      int found = 0;
+      int strIndex[] = { 0, -1 };
+      int maxIndex = payload_str.length() - 1;
 
- // if (SPIFFS.exists(filename)) SPIFFS.remove(filename); // First in this example check to see if a file already exists, if so delete it
+      for (int i = 0; i <= maxIndex && found <= index; i++) {
+        if (payload_str.charAt(i) == separator || i == maxIndex) {
+          found++;
+          strIndex[0] = strIndex[1] + 1;
+          strIndex[1] = (i == maxIndex) ? i + 1 : i;
+        }
+      }
+      Serial.println(strIndex[0]);
+      Serial.println(strIndex[1]);
+      Serial.println(strIndex[2]);
+      Serial.println(strIndex[3]);
+      Serial.println(strIndex[4]);
+      //end new add
+      //if(payload_str == "requesttemp")
+      /*
+        USE_SERIAL.printf("[WSc] get text: %s\n", payload);
+        memcpy(arrPattern, arrRightOn, sizeof arrPattern);
+               // send data to back to Server
+               webSocket.sendTXT(payload, lenght);
+               break;
+      */
+      //edn possible other option add below line
+      //Serial.printf("[%u] here it is: %s\n",payload);
+      //and commented this
+      Serial.printf("[%u] here it is: %s\n", num, payload);
+      webSocket.sendTXT(0, "pong"); //send message back to client
+      Serial.println("Handling files now ...ROCKOFF");
+      //add spiffss den
+      // Assign a file name e.g. 'names.dat' or 'data.txt' or 'data.dat' try to use the 8.3 file naming convention format could be 'data.d'
+      char filename [] = "datalog.txt";                     // Assign a filename or use the format e.g. SD.open("datalog.txt",...);
 
-  File myDataFile = SPIFFS.open(filename, "a+");        // Open a file for reading and writing (appending)
-  if (!myDataFile)Serial.println("file open failed");   // Check for errors
-  
-  //den add
-  for(int i = 0; i < length; i++) myDataFile.println((char) payload[i]);
-  //myDataFile.println(payloads);     // Write some data to it (26-characters)
-  myDataFile.println(3.141592654);
-  Serial.println(myDataFile.size());                    // Display the file size (26 characters + 4-byte floating point number + 6 termination bytes (2/line) = 34 bytes)
-  myDataFile.close();                                   // Close the file
+      // if (SPIFFS.exists(filename)) SPIFFS.remove(filename); // First in this example check to see if a file already exists, if so delete it
 
-  myDataFile = SPIFFS.open(filename, "r");              // Open the file again, this time for reading
-  if (!myDataFile) Serial.println("file open failed");  // Check for errors
-  while (myDataFile.available()) {
-    Serial.write(myDataFile.read());                    // Read all the data from the file and display it
-  }
-  myDataFile.close();                                   // Close the file
-  delay(10000);                                         // wait and then do it all again
- //end add spiffs den
- server.send(200, "text/html", "Handling files now ROCKOFF"); //Send ADC value only to client ajax request
-    //end added by Den
-     //22/06/18 Serial.printf("[%u] get Text: %s\n", num, payload);
+      File myDataFile = SPIFFS.open(filename, "a+");        // Open a file for reading and writing (appending)
+      if (!myDataFile)Serial.println("file open failed");   // Check for errors
+
+      //den add
+      for (int i = 0; i < length; i++) myDataFile.println((char) payload[i]);
+      //myDataFile.println(payloads);     // Write some data to it (26-characters)
+      myDataFile.println(3.141592654);
+      Serial.println(myDataFile.size());                    // Display the file size (26 characters + 4-byte floating point number + 6 termination bytes (2/line) = 34 bytes)
+      myDataFile.close();                                   // Close the file
+
+      myDataFile = SPIFFS.open(filename, "r");              // Open the file again, this time for reading
+      if (!myDataFile) Serial.println("file open failed");  // Check for errors
+      while (myDataFile.available()) {
+        Serial.write(myDataFile.read());                    // Read all the data from the file and display it
+      }
+      myDataFile.close();                                   // Close the file
+      delay(10000);                                         // wait and then do it all again
+      //end add spiffs den
+      server.send(200, "text/html", "Handling files now ROCKOFF"); //Send ADC value only to client ajax request
+      //end added by Den
+      //22/06/18 Serial.printf("[%u] get Text: %s\n", num, payload);
       //added 180917 6.20
-      
+
       //decoded %u >Print decimal unsigned int $s > null-terminated string -- num and payload are the vars
       if (payload[0] == '#') {            // we get RGB data
         /*
-        uint32_t rgb = (uint32_t) strtol((const char *) &payload[1], NULL, 16);   // decode rgb data
-        int r = ((rgb >> 20) & 0x3FF);                     // 10 bits per color, so R: bits 20-29
-        int g = ((rgb >> 10) & 0x3FF);                     // G: bits 10-19
-        int b =          rgb & 0x3FF;                      // B: bits  0-9
+          uint32_t rgb = (uint32_t) strtol((const char *) &payload[1], NULL, 16);   // decode rgb data
+          int r = ((rgb >> 20) & 0x3FF);                     // 10 bits per color, so R: bits 20-29
+          int g = ((rgb >> 10) & 0x3FF);                     // G: bits 10-19
+          int b =          rgb & 0x3FF;                      // B: bits  0-9
 
-        analogWrite(LED_RED,   r);                         // write it to the LED output pins
-        analogWrite(LED_GREEN, g);
-        analogWrite(LED_BLUE,  b);
+          analogWrite(LED_RED,   r);                         // write it to the LED output pins
+          analogWrite(LED_GREEN, g);
+          analogWrite(LED_BLUE,  b);
         */
+        //
+        //char buffers for packet
+        char A[6] = {'\0' };
+        char B[7] = {'\0' };
+        char C[11] = {'\0' };
+        char D[11] = {'\0' };
+        char E[7] = {'\0' };
+        char F[5] = {'\0' };
+        char G[3] = {'\0' };
+sscanf((char *)payload, "%s %s %s %s %s %s %s", A, B, C, D, E, F, G);
+        //sscanf((char *) &payload[sizeof(payload)], "%s,%s,%s,%s,%s,%s,%s", A, B, C, D, E, F , G);
+        /*
+          Serial.println(A);
+          Serial.println(B);
+          Serial.println(C);
+          Serial.println(D);
+          Serial.println(E);
+          Serial.println(F);
+          Serial.println(G);
+        */
+        Serial.println(A[0]);
+        Serial.println(A[1]);
+        Serial.println(A[2]);
+        Serial.println(A[3]);
+        Serial.println(A[4]);
+        Serial.println(A[5]);
+        Serial.println(A[6]);
+
+        Serial.println(B[0]);
+        Serial.println(B[1]);
+        Serial.println(B[2]);
+        Serial.println(B[3]);
+        Serial.println(B[4]);
+        Serial.println(B[5]);
+        Serial.println(B[6]);
+        Serial.println(B[7]);
+        
+        Serial.println(C[0]);
+        Serial.println(C[1]);
+        Serial.println(C[2]);
+        Serial.println(C[3]);
+        Serial.println(C[4]);
+        Serial.println(C[5]);
+        Serial.println(C[6]);
+        Serial.println(C[8]);
+        Serial.println(C[9]);
+        Serial.println(C[10]);
+        
+        
+        Serial.println(D[0]);
+        Serial.println(D[1]);
+        Serial.println(D[2]);
+        Serial.println(D[3]);
+        Serial.println(D[4]);
+        Serial.println(D[5]);
+        Serial.println(D[6]);
+        Serial.println(D[8]);
+        Serial.println(D[9]);
+        Serial.println(D[10]);
+        
+
+
+        Serial.println(E[0]);
+        Serial.println(E[1]);
+        Serial.println(E[2]);
+        Serial.println(E[3]);
+        Serial.println(E[4]);
+        Serial.println(E[5]);
+        Serial.println(E[6]);
+               
+
+        Serial.println(F[0]);
+        Serial.println(F[1]);
+        Serial.println(F[2]);
+        Serial.println(F[3]);
+        Serial.println(F[4]);
+        
+
+        Serial.println(G[0]);
+        Serial.println(G[1]);
+        Serial.println(G[2]);
+        
+        //clear the arrays
+        memset(A, 0, sizeof(A));
+        memset(B, 0, sizeof(B));
+        memset(C, 0, sizeof(C));
+        memset(D, 0, sizeof(D));
+        memset(E, 0, sizeof(E));
+        memset(F, 0, sizeof(F));
+        memset(G, 0, sizeof(G));
+
         //added 180917
         Serial.print("payload[0] : "); Serial.print((char)payload[0]);
         Serial.print("payload[1] : "); Serial.print((char)payload[1]);
@@ -346,11 +453,29 @@ memcpy(arrPattern, arrRightOn, sizeof arrPattern);
         Serial.print("payload[3] : "); Serial.print((char)payload[3]);
         Serial.print("payload[4] : "); Serial.print((char)payload[4]);
         Serial.print("payload[5] : "); Serial.print((char)payload[5]);
-        
+        Serial.print("payload[6] : "); Serial.print((char)payload[6]);
+        Serial.print("payload[7] : "); Serial.print((char)payload[7]);
+        Serial.print("payload[8] : "); Serial.print((char)payload[8]);
+        Serial.print("payload[9] : "); Serial.print((char)payload[9]);
+        Serial.print("payload[10] : "); Serial.print((char)payload[10]);
+        Serial.print("payload[11] : "); Serial.print((char)payload[11]);
+        Serial.print("payload[12] : "); Serial.print((char)payload[12]);
+        Serial.print("payload[13] : "); Serial.print((char)payload[13]);
+        Serial.print("payload[14] : "); Serial.print((char)payload[14]);
+        Serial.print("payload[15] : "); Serial.print((char)payload[15]);
+        Serial.print("payload[16] : "); Serial.print((char)payload[16]);
+        Serial.print("payload[17] : "); Serial.print((char)payload[17]);
+        Serial.print("payload[18] : "); Serial.print((char)payload[18]);
+
+
+
+
+
+
       } else if (payload[0] == '%') {                      // the browser sends an R when the rainbow effect is enabled
         rainbow = true;
-        
-        
+
+
       } else if (payload[0] == 'N') {                      // the browser sends an N when the rainbow effect is disabled
         rainbow = false;
       } else if (payload[0] == '*') {                      // the browser sends a * when its a message from den
@@ -360,16 +485,16 @@ memcpy(arrPattern, arrRightOn, sizeof arrPattern);
       } else if (payload[0] == 'Z') {                      // the browser sends a * when its a message from den
         Serial.print("Read spiffs requested");
         //call spiffs dir listing here
-         Serial.println("READING SPIFFS started. Contents:");
-  {
-    Dir dir = SPIFFS.openDir("/");
-    while (dir.next()) {                      // List the file system contents
-      String fileName = dir.fileName();
-      size_t fileSize = dir.fileSize();
-      Serial.printf("\tFS File: %s, size: %s\r\n", fileName.c_str(), formatBytes(fileSize).c_str());
-    }
-    Serial.printf("\n");
-  }
+        Serial.println("READING SPIFFS started. Contents:");
+        {
+          Dir dir = SPIFFS.openDir("/");
+          while (dir.next()) {                      // List the file system contents
+            String fileName = dir.fileName();
+            size_t fileSize = dir.fileSize();
+            Serial.printf("\tFS File: %s, size: %s\r\n", fileName.c_str(), formatBytes(fileSize).c_str());
+          }
+          Serial.printf("\n");
+        }
       }
       break;
   }
