@@ -94,7 +94,7 @@ void startWiFi() { // Start a Wi-Fi access point, and try to connect to some giv
   // WiFi.softAP(ssid2, password2);             // Start the access point
 
   WiFi.hostname(deviceName);      // DHCP Hostname (useful for finding device for static lease)
-  WiFi.config(staticIP, subnet, gateway, dns);
+   WiFi.config(staticIP, dns, gateway, subnet);
   server.serveStatic("/fp", SPIFFS, "/flatpickr3.html");
   server.serveStatic("/datalog.txt", SPIFFS, "/datalog.txt");
   WiFi.begin(ssid, password);
